@@ -92,21 +92,31 @@ print("序号, 日期, 网页文章标题, 类型, 文字字数, 视频时长, �
 for res in results:
     print(f"{res['序号']}, {res['日期']}, {res['网页文章标题']}, {res['类型']}, {res['文字字数']}, {res['视频时长']}, {res['字数时长']}, {res['来源']}, {res['摘要']}")
 
-# 将结果保存到Excel文件
+# 将结果保存到Excel和CSV文件
 if results:
     out_df = pd.DataFrame(results)
-    out_path = '结果.xlsx'
+    
+    # 保存Excel文件
+    out_xlsx = '结果.xlsx'
     try:
-        out_df.to_excel(out_path, index=False)
-        print(f"已将结果保存到: {out_path}")
-        
-        # 调用Word生成脚本
-        print("\n开始生成Word文档...")
-        try:
-            from generate_docs import generate_word_docs
-            generate_word_docs(out_path)
-            print("Word文档生成完成!")
-        except Exception as e:
-            print(f"生成Word文档时出错: {e}")
+        out_df.to_excel(out_xlsx, index=False)
+        print(f"✓ 已将结果保存到: {out_xlsx}")
     except Exception as e:
-        print(f"保存Excel失败: {e}")
+        print(f"✗ 保存Excel失败: {e}")
+    
+    # 保存CSV文件（用于Word文档生成）
+    out_csv = '结果.csv'
+    try:
+        out_df.to_csv(out_csv, index=False, encoding='utf-8-sig')
+        print(f"✓ 已将结果保存到: {out_csv}")
+    except Exception as e:
+        print(f"✗ 保存CSV失败: {e}")
+    
+    # 调用Word生成脚本
+    print("\n开始生成Word文档...")
+    try:
+        from generate_docs import generate_word_docs
+        generate_word_docs()  # 使用CSV作为数据源
+        print("✓ Word文档生成完成!")
+    except Exception as e:
+        print(f"✗ 生成Word文档时出错: {e}")
