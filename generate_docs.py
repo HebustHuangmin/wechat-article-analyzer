@@ -43,40 +43,44 @@ def apply_type_font(paragraph):
             pass
 
 
-def replace_text_in_runs(paragraph, old_text, new_text, keep_suffix=False, apply_default_font=True):
-    """在段落的runs中替换文本（保留格式）
+def replace_text_in_runs(paragraph, old_text, new_text, keep_suffix=False, use_kaiti=False):
+    """在段落的runs中替换文本（保留原始格式）
     
     keep_suffix: 为True时，保留占位符后面的原始文本（用于日期保留时间）
-    apply_default_font: 替换后是否应用默认仿宋字体；对类型字段传 False
+    use_kaiti: 为True时，应用楷体_GB2312三号字体（用于类型字段）
     """
     if old_text not in paragraph.text:
         return False
 
     full_text = paragraph.text
-
-    # 如果需要保留占位符之后的文本（如日期后面的时间），只替换占位符本身
+    
+    # 计算替换后的完整文本
     if keep_suffix:
-        paragraph.text = full_text.replace(old_text, str(new_text), 1)
-        if apply_default_font:
-            apply_font(paragraph)
-        return True
-
-    # 如果占位符在行首且后面带示例/选项，则直接替换成实际值，去掉示例文字
-    if full_text.strip().startswith(old_text) and len(full_text.strip()) > len(old_text):
-        paragraph.text = str(new_text)
-        if apply_default_font:
-            apply_font(paragraph)
-        return True
-
-    # 清空原有runs并按原样替换占位符
-    for run in paragraph.runs:
-        run.text = ""
-
-    new_paragraph_text = full_text.replace(old_text, new_text, 1)
-    paragraph.text = new_paragraph_text
-
-    if apply_default_font:
-        apply_font(paragraph)
+        new_full_text = full_text.replace(old_text, str(new_text), 1)
+    elif full_text.strip().startswith(old_text) and len(full_text.strip()) > len(old_text):
+        # 如果占位符在行首且后面带示例/选项，则直接替换成实际值，去掉示例文字
+        new_full_text = str(new_text)
+    else:
+        new_full_text = full_text.replace(old_text, str(new_text), 1)
+    
+    # 在第一个run中替换文本
+    if paragraph.runs:
+        first_run = paragraph.runs[0]
+        # 清空其他runs
+        for r in paragraph.runs[1:]:
+            r.text = ''
+        # 第一个run设置新文本
+        first_run.text = new_full_text
+        
+        # 如果需要应用楷体三号
+        if use_kaiti:
+            first_run.font.name = '楷体_GB2312'
+            first_run.font.size = Pt(16)
+            try:
+                first_run._element.rPr.rFonts.set(qn('w:eastAsia'), '楷体_GB2312')
+            except Exception:
+                pass
+    
     return True
 
 
@@ -122,44 +126,32 @@ def fill_template(template_path, context):
     
     # 在段落中替换文本
     for paragraph in doc.paragraphs:
-        type_replaced = False
         for key, value in context.items():
             placeholder = f"{{{{{key}}}}}"
             if placeholder in paragraph.text:
                 # 日期特殊处理：格式化且保留后缀（如时间）
                 if key == '日期':
                     replace_text_in_runs(paragraph, placeholder, format_date(value), keep_suffix=True)
-                # 类型前加对勾方框，使用楷体三号（跳过默认字体）
+                # 类型渲染为复选框列表，使用楷体三号
                 elif key == '类型':
-                    replace_text_in_runs(paragraph, placeholder, format_type(value), apply_default_font=False)
-                    type_replaced = True
+                    replace_text_in_runs(paragraph, placeholder, format_type(value), use_kaiti=True)
                 else:
                     replace_text_in_runs(paragraph, placeholder, str(value))
-        if type_replaced:
-            apply_type_font(paragraph)
-        else:
-            apply_font(paragraph)
     
     # 在表格中替换文本
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for paragraph in cell.paragraphs:
-                    type_replaced = False
                     for key, value in context.items():
                         placeholder = f"{{{{{key}}}}}"
                         if placeholder in paragraph.text:
                             if key == '日期':
                                 replace_text_in_runs(paragraph, placeholder, format_date(value), keep_suffix=True)
                             elif key == '类型':
-                                replace_text_in_runs(paragraph, placeholder, format_type(value), apply_default_font=False)
-                                type_replaced = True
+                                replace_text_in_runs(paragraph, placeholder, format_type(value), use_kaiti=True)
                             else:
                                 replace_text_in_runs(paragraph, placeholder, str(value))
-                    if type_replaced:
-                        apply_type_font(paragraph)
-                    else:
-                        apply_font(paragraph)
     
     return doc
 
