@@ -31,21 +31,17 @@ def analyze_webpage(url):
         chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
         # 使用Selenium获取页面（视频div是JavaScript动态生成的）
-        import os
-        os.environ['WDM_LOG'] = '0'  # 禁用webdriver-manager日志
-        
+        # 优先使用Selenium内置的driver管理，失败再回退到webdriver_manager
         try:
-            service = Service(ChromeDriverManager().install())
-        except Exception as e:
-            # 如果webdriver_manager初始化失败，尝试直接使用Chrome
-            import shutil
-            chrome_path = shutil.which('chrome') or shutil.which('chromium')
-            if chrome_path:
-                service = Service(chrome_path)
-            else:
-                raise Exception(f"无法找到ChromeDriver: {e}")
-        
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+            driver = webdriver.Chrome(options=chrome_options)
+        except Exception as e1:
+            import os
+            os.environ['WDM_LOG'] = '0'  # 禁用webdriver-manager日志
+            try:
+                service = Service(ChromeDriverManager().install())
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+            except Exception as e2:
+                raise Exception(f"无法启动Chrome浏览器，请检查已安装的Chrome/ChromeDriver。原始错误: {e1} | {e2}")
         driver.set_page_load_timeout(20)
         driver.get(url)
         
