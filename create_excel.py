@@ -1,11 +1,31 @@
 from openpyxl import Workbook
 from openpyxl.styles import Font
+import os
+
+# 读取KeyDept文件中的部门关键字
+def load_department_keywords():
+    if os.path.exists('KeyDept'):
+        with open('KeyDept', 'r', encoding='utf-8') as f:
+            keywords = [line.strip() for line in f if line.strip()]
+        return keywords
+    return []
+
+def find_department(title, keywords):
+    if not title or not keywords:
+        return ''
+    title_str = str(title)
+    for keyword in keywords:
+        if keyword and keyword in title_str:
+            return keyword
+    return ''
+
+DEPARTMENT_KEYWORDS = load_department_keywords()
 
 wb = Workbook()
 ws = wb.active
 
 # 添加标题
-headers = ['序号', '日期', '网页文章标题', '原发转载', '类型', '文字字数', '视频时长', '字数时长', '来源', '摘要', '链接']
+headers = ['序号', '日期', '网页文章标题', '原发转载', '类型', '文字字数', '视频时长', '字数时长', '来源', '摘要', '部门', '链接']
 ws.append(headers)
 
 # 添加数据（共25行）
@@ -38,6 +58,21 @@ data = [
 ]
 
 for row in data:
+    # 规范“字数时长”：有视频两行，无视频仅文字
+    if row[6] == '无视频':
+        row[7] = f"文字{row[5]}字"
+    else:
+        row[7] = f"视频{row[6]}\n文字{row[5]}字"    
+    # 查找部门：仅当原发时才查找关键字
+    dept = ''
+    if row[3] == '原发':
+        dept = find_department(row[2], DEPARTMENT_KEYWORDS)
+    row.insert(10, dept)  # 在摘要后插入部门
+    
+    # 链接处理：原发为空，转载保留链接
+    if row[3] == '原发':
+        row[11] = ''  # 原发时链接列置空
+    
     ws.append(row)
 
 wb.save('结果.xlsx')

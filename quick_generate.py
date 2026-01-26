@@ -5,6 +5,25 @@
 import pandas as pd
 import os
 
+# 读取KeyDept文件中的部门关键字
+def load_department_keywords():
+    if os.path.exists('KeyDept'):
+        with open('KeyDept', 'r', encoding='utf-8') as f:
+            keywords = [line.strip() for line in f if line.strip()]
+        return keywords
+    return []
+
+def find_department(title, keywords):
+    if not title or not keywords:
+        return ''
+    title_str = str(title)
+    for keyword in keywords:
+        if keyword and keyword in title_str:
+            return keyword
+    return ''
+
+DEPARTMENT_KEYWORDS = load_department_keywords()
+
 # 首次成功运行中提取的完整数据
 results_data = [
     {'序号': 1, '日期': '2026-01-12', '网页文章标题': '全力冲刺"开门红"丨铆劲攻坚 石家庄市制造企业按下生产"加速键"', '原发转载': '转载', '类型': '文字，视频', '文字字数': 393, '视频时长': '04:00', '字数时长': '字数（393）时长（04:00）', '来源': '石家庄新闻', '摘要': '全力冲刺"开门红"丨铆劲攻坚 石家庄市制造企业按下生产"加速键"'},
@@ -36,7 +55,19 @@ results_data = [
 
 # 生成Excel
 df = pd.DataFrame(results_data)
-df.to_excel('结果.xlsx', index=False, engine='openpyxl')
+# 规范“字数时长”：有视频两行，无视频仅文字
+df['字数时长'] = df.apply(
+    lambda r: f"文字{r['文字字数']}字" if r['视频时长'] == '无视频' else f"视频{r['视频时长']}\n文字{r['文字字数']}字",
+    axis=1
+)# 查找部门：仅当原发时才查找关键字
+df['部门'] = df.apply(
+    lambda r: find_department(r['网页文章标题'], DEPARTMENT_KEYWORDS) if r['原发转载'] == '原发' else '',
+    axis=1
+)# 链接处理：原发为空，转载保留链接
+df['链接'] = df.apply(
+    lambda r: '' if r['原发转载'] == '原发' else r.get('链接', ''),
+    axis=1
+)df.to_excel('结果.xlsx', index=False, engine='openpyxl')
 print(f"✓ 已生成结果.xlsx，共{len(df)}条记录")
 
 # 生成Word文档

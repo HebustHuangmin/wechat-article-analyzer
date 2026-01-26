@@ -11,6 +11,27 @@ except ModuleNotFoundError:
     from web_analyzer import analyze_webpage
 from datetime import datetime, timedelta
 
+# 读取KeyDept文件中的部门关键字
+def load_department_keywords():
+    """从KeyDept文件中读取部门名称作为关键字"""
+    if os.path.exists('KeyDept'):
+        with open('KeyDept', 'r', encoding='utf-8') as f:
+            keywords = [line.strip() for line in f if line.strip()]
+        return keywords
+    return []
+
+def find_department(title, keywords):
+    """在标题中查找部门关键字，返回第一个匹配的部门名称"""
+    if not title or not keywords:
+        return ''
+    title_str = str(title)
+    for keyword in keywords:
+        if keyword and keyword in title_str:
+            return keyword
+    return ''
+
+DEPARTMENT_KEYWORDS = load_department_keywords()
+
 # 读取Excel文件
 df = pd.read_excel('高新发布.xlsx')
 
@@ -67,11 +88,19 @@ for seq_idx, (idx, row) in enumerate(filtered_df.iterrows(), start=1):
         if durations:
             video_duration_text = '、'.join(durations)
     
-    # 构建字数时长列：无视频只显示字数，有视频则显示字数和时长
+    # 构建字数时长列：有视频则两行显示，无视频只显示文字
     if video_duration_text == '无视频':
-        char_duration_text = f"字数（{word_count}）"
+        char_duration_text = f"文字{word_count}字"
     else:
-        char_duration_text = f"字数（{word_count}）时长（{video_duration_text}）"
+        char_duration_text = f"视频{video_duration_text}\n文字{word_count}字"
+    
+    # 查找部门：仅当原发时才查找关键字
+    department = ''
+    if origin_type == '原发':
+        department = find_department(title, DEPARTMENT_KEYWORDS)
+    
+    # 链接处理：原发为空，转载保留链接
+    article_link = '' if origin_type == '原发' else link
     
     results.append({
         '序号': seq_idx,
@@ -84,7 +113,8 @@ for seq_idx, (idx, row) in enumerate(filtered_df.iterrows(), start=1):
         '字数时长': char_duration_text,
         '来源': source,
         '摘要': summary,
-        '链接': link
+        '部门': department,
+        '链接': article_link
     })
 
 # 输出结果
